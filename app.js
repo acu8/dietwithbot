@@ -1,15 +1,17 @@
-const line = require('@line/bot-sdk');
 const express = require('express');
+const { messagingApi } = require('@line/bot-sdk');
 require('dotenv').config();
+
+const app = express();
 
 const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET
 };
 
-const client = new line.Client(lineConfig);
-
-const app = express();
+const client = new messagingApi.MessagingApiClient({
+  channelAccessToken: lineConfig.channelAccessToken,
+});
 
 // ルートパスのハンドラを追加
 app.get('/', (req, res) => {
@@ -17,7 +19,7 @@ app.get('/', (req, res) => {
   res.send('Hello, this is the LINE bot server!');
 });
 
-app.post('/webhook', line.middleware(lineConfig), (req, res) => handleBot(req, res));
+app.post('/webhook', express.json(), (req, res) => handleBot(req, res));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Listening on ${PORT}`));
@@ -28,27 +30,31 @@ async function handleBot(req, res) {
   const events = req.body.events;
   console.log('Events:', JSON.stringify(events, null, 2));
 
-  return Promise.all(events.map(async (event) => {
+  for (const event of events) {
     console.log('Processing event:', event.type);
     if (event.type !== 'message' || event.message.type !== 'text') {
       console.log('Skipping non-text message event');
-      return null;
+      continue;
     }
     console.log('Replying to message:', event.message.text);
     try {
-        const result = await client.replyMessage(event.replyToken, {
+      const result = await client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [{
           type: 'text',
           text: `受信したメッセージ: ${event.message.text}`
-        });
-        console.log('Reply sent successfully. Response:', JSON.stringify(result));
-      } catch (error) {
-        console.error('Error sending reply:', error);
-        if (error instanceof Error) {
-          console.error('Error details:', error.message);
-          console.error('Error stack:', error.stack);
-        }
+        }]
+      });
+      console.log('Reply sent successfully. Response:', JSON.stringify(result));
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      if (error instanceof messagingApi.HTTPFetchError) {
+        console.error('HTTP Fetch Error:', error.status);
+        console.error('Request ID:', error.headers.get('x-line-request-id'));
+        console.error('Error body:', error.body);
       }
-  }));
+    }
+  }
 }
 
 // エラーハンドリングを追加
