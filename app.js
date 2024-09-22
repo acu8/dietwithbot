@@ -38,13 +38,12 @@ async function handleBot(req, res) {
     }
     console.log('Replying to message:', event.message.text);
     try {
-      const result = await client.replyMessage({
-        replyToken: event.replyToken,
-        messages: [{
-          type: 'text',
-          text: `受信したメッセージ: ${event.message.text}`
-        }]
-      });
+        const result = await client.replyMessage(event.replyToken, [
+            {
+              type: 'text',
+              text: `受信したメッセージ: ${event.message.text}`,
+            },
+        ]);
       console.log('Reply sent successfully. Response:', JSON.stringify(result));
     } catch (error) {
       console.error('Error sending reply:', error);
